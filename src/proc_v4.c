@@ -1,52 +1,54 @@
-#include	"ping.h"
+#include "ping.h"
 
-float tv_sub(struct timeval *out, struct timeval *in) {
-	double outa = out->tv_sec*1000.0+out->tv_usec/1000.0;
-	double ina = in->tv_sec*1000.0+in->tv_usec/1000.0;
-	return (out->tv_usec-in->tv_usec)/1000.0;
+/* 返回 recv - send 的毫秒差，正确处理秒与微秒进位 */
+static double tv_sub_ms(const struct timeval *tvrecv,
+		const struct timeval *tvsend)
+{
+	double ms_recv = tvrecv->tv_sec * 1000.0 + tvrecv->tv_usec / 1000.0;
+	double ms_send = tvsend->tv_sec * 1000.0 + tvsend->tv_usec / 1000.0;
+	return ms_recv - ms_send;
 }
 
-void proc_v4(char *ptr, ssize_t len, struct msghdr *msg, struct timeval *tvrecv) {
+void proc_v4(char *ptr, ssize_t len, struct msghdr *msg,
+		struct timeval *tvrecv)
+{
 	int hlen1, icmplen;
-	double rtt;
 	struct ip *ip;
 	struct icmp *icmp;
 	struct timeval *tvsend;
+	struct sockaddr_in *ipin;
+	char ipstr[INET_ADDRSTRLEN];
+	double rtt;
 
-/*	int i;
-	for (i = 0; i < len; i++)
-		printf("%x ", *(msg + i));
-	printf("\n");
+	if (len < (ssize_t)sizeof(struct ip))
+		return;
 
-	for (i = 0; i < msg->msg_iovlen; i++)
-		printf("%x ", *(ptr + i));
-	printf("\n");*/
-
-	ip = (struct ip *) ptr; /* start of IP header */
-	hlen1 = ip->ip_hl << 2; /* length of IP header */
-
+	ip = (struct ip *)ptr;
+	hlen1 = ip->ip_hl << 2;		/* IHL 以 4 字节为单位 */
+	if (hlen1 < 20)
+		return;
 	if (ip->ip_p != IPPROTO_ICMP)
-		return; /* not ICMP */
+		return;
 
-	icmp = (struct icmp *) (ptr + hlen1); /* start of ICMP header */
-	if ((icmplen = len - hlen1) < 8)
-		return; /* malformed packet */
+	icmp = (struct icmp *)(ptr + hlen1);
+	icmplen = (int)len - hlen1;
+	if (icmplen < ICMP_HLEN)
+		return;
 
-	if (icmp->icmp_type == ICMP_ECHOREPLY) {
-		if (icmp->icmp_id != pid)
-			return; /* not a response to our ECHO_REQUEST */
-		if (icmplen < 16)
-			return; /* not enough data to use */
+	/* 只处理对本进程 Echo Request 的应答；数据区至少要有 timeval */
+	if (icmp->icmp_type != ICMP_ECHOREPLY)
+		return;
+	if (icmp->icmp_id != pid)
+		return;
+	if (icmplen < ICMP_HLEN + (int)sizeof(struct timeval))
+		return;
 
-		tvsend = (struct timeval *) icmp->icmp_data;
-		rtt = tvrecv->tv_sec * 1000.0 + tvrecv->tv_usec / 1000.0;
-		float timeDef = tv_sub(tvrecv, tvsend);
+	tvsend = (struct timeval *)icmp->icmp_data;
+	rtt = tv_sub_ms(tvrecv, tvsend);
 
-		char ipstr[16];
-		struct sockaddr_in * ipin = (struct sockaddr_in *)sarecv;
-		inet_ntop(AF_INET,&(ipin->sin_addr), ipstr, salen);
+	ipin = (struct sockaddr_in *)msg->msg_name;
+	inet_ntop(AF_INET, &ipin->sin_addr, ipstr, sizeof(ipstr));
 
-		printf("%d bytes from %s: seq=%u, ttl=%d, rtt=%.3f ms\n", icmplen,
-				ipstr, icmp->icmp_seq, ip->ip_ttl, timeDef);
-	}
+	printf("%d bytes from %s: seq=%u, ttl=%d, rtt=%.3f ms\n",
+			icmplen, ipstr, icmp->icmp_seq, ip->ip_ttl, rtt);
 }

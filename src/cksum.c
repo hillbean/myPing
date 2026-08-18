@@ -1,33 +1,30 @@
 #include "ping.h"
 
+/*
+ * RFC 1071 Internet 校验和：按 16 位累加，把高 16 位进位折回，再取反。
+ * ICMP 头部在计算前须把 icmp_cksum 置 0。
+ */
 u_int16_t
-in_cksum(u_short * addr, int len)
+in_cksum(u_short *addr, int len)
 {
-	register int nleft = len;
-	register u_short *w = addr;
-	register int sum = 0;
+	int nleft = len;
+	u_short *w = addr;
+	int sum = 0;
 	u_short answer = 0;
 
-	/*
-	 * Our algorithm is simple, using a 32 bit accumulator (sum), we add
-	 * sequential 16 bit words to it, and at the end, fold back all the
-	 * carry bits from the top 16 bits into the lower 16 bits.
-	 */
-	while (nleft > 1)  {
+	while (nleft > 1) {
 		sum += *w++;
 		nleft -= 2;
 	}
 
-	/* mop up an odd byte, if necessary */
+	/* 奇数长度时，最后一字节按高 8 位补进累加器 */
 	if (nleft == 1) {
-		*(u_char *)(&answer) = *(u_char *)w ;
+		*(u_char *)(&answer) = *(u_char *)w;
 		sum += answer;
 	}
 
-	/* add back carry outs from top 16 bits to low 16 bits */
-	sum = (sum >> 16) + (sum & 0xffff);	/* add hi 16 to low 16 */
-	sum += (sum >> 16);			/* add carry */
-	answer = ~sum;				/* truncate to 16 bits */
-	//printf("cksum : 0x%x\n", answer);
-	return (answer);
+	sum = (sum >> 16) + (sum & 0xffff);
+	sum += (sum >> 16);
+	answer = ~sum;
+	return answer;
 }

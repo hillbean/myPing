@@ -1,6 +1,6 @@
 # myPing
 
-自己编写的 ICMP ping 程序。当前只支持 IPv4，暂不解析命令行参数（`-v` 等选项未实现）。
+自己编写的 ICMP ping 程序。当前只支持 IPv4，用法为 `./ping <destination>`（暂不支持 `-v` 等选项）。
 
 程序通过 **RAW socket** 发送 `ICMP Echo Request`，并打印回复的序号、TTL 和 RTT。依赖 POSIX / Linux 网络接口（`SOCK_RAW`、`recvmsg`、`netinet/ip_icmp.h` 等），**不能用 MSVC 在原生 Windows 上直接编译运行**。
 
@@ -16,10 +16,8 @@
 在项目根目录执行：
 
 ```bash
-gcc -fcommon -O0 -g3 -Wall -o ping src/*.c
+gcc -O0 -g3 -Wall -o ping src/*.c
 ```
-
-`-fcommon` 是必需的：全局变量定义在 `src/ping.h` 中，GCC 10 及以后默认 `-fno-common`，不加该选项会在链接时报 `multiple definition`。
 
 也可以使用 Eclipse CDT 生成的 Makefile：
 
@@ -28,7 +26,7 @@ cd Debug
 make
 ```
 
-产物为 `Debug/ping`。若 `make` 链接失败，在链接命令中同样加上 `-fcommon`，或改用上面的一条 `gcc` 命令。
+产物为 `Debug/ping`。若 Eclipse 的链接步骤失败，改用上面的一条 `gcc` 命令即可。
 
 ### 运行
 
@@ -48,7 +46,7 @@ ping www.example.com (93.184.216.34): 56 data bytes.
 
 程序会每秒发送一次探测并进入无限循环，用 `Ctrl+C` 结束。
 
-无参数时会把程序自身路径当成目标，DNS 解析会失败，请始终传入目标地址。
+未传目标时会打印 usage 并退出。程序每秒发送一帧，收到 Echo Reply 后打印序号、TTL 和 RTT；用 `Ctrl+C` 结束。
 
 ## Windows
 
@@ -66,7 +64,7 @@ ping www.example.com (93.184.216.34): 56 data bytes.
 2. 在 WSL 中进入本仓库目录，按上面的 **Linux** 步骤编译、运行：
 
    ```bash
-   gcc -fcommon -O0 -g3 -Wall -o ping src/*.c
+   gcc -O0 -g3 -Wall -o ping src/*.c
    sudo ./ping 8.8.8.8
    ```
 
@@ -80,7 +78,7 @@ Cygwin 理论上也可提供 POSIX 环境，但仍需 RAW socket 权限，且 IC
 
 - `<destination>`：主机名或 IPv4 地址（取命令行最后一个参数）
 - ICMP 数据长度为 56 字节（与常见 `ping` 默认一致）
-- 头文件中的 `usage: ping [-v] <option> destinationIPaddress` 尚未实现，传入 `-v` 不会生效
+- 暂不支持 `-v` 等选项；传入多余参数时仍取最后一个作为目标
 
 ## 工程结构
 

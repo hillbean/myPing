@@ -1,4 +1,5 @@
 {
   "name": "myPing",
-  "install": "gcc -O0 -g3 -Wall -o ping src/*.c"
+  "install": "gcc -O0 -g3 -Wall -o ping src/*.c",
+  "start": "gcc -O0 -g3 -Wall -o ping src/*.c"
 }
